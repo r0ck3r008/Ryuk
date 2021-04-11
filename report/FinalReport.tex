@@ -37,6 +37,32 @@
 \tableofcontents
 \newpage
 \section{Executive Summary}
+The provided binary has been identified to belong to \textit{Ryuk} family of \textit{Ransomwares} \cite{ransomware}.
+This family of ransomwares gain access to victim systems via phishing \cite{phishing} or social engineering \cite{socialEngg} attacks and are known to be biased towards targeting commercial systems more as compared to personal systems.
+\textit{FBI} warned against this campaign citing the malware authors as most profitable when compared to other authors of such malwares.
+Also, this malware family is known to attack \textit{Windows} systems in general and \textit{Windows 10} systems in particular.
+
+The malware binary itself is very small in size, around \textit{170 KB}, and has no significant obfuscation techniques built in.
+Nevertheless, on dynamic analysis, the malware injects itself into common \textit{Windows} processes and installs a registry key to achieve persistance over reboots.
+Any new file created or drive \textit{(for eg. USB etc.)} connected to the system is also targeted and encrypted.
+Before any encryption happens, the malware,
+\begin{itemize}
+	\item Stops and kills multiple services and executables respectively generally associated with commercial systems
+	\item Enumerates all drives associated to the system and all the files within it.
+\end{itemize}
+
+The execution of malware is entirely offline and hence once infected, isolating the system from the network does not thwart its any malicious activities.
+This also means that leaking of sensitive information from the infected system is highly improbable as a result of this infection.
+After encryption, the malware installs multiple text files named \textit{RyukReadme.txt} acknowledging the data loss, stating the ransom and providing correspondence email and \textit{Bitcoin Wallet} addresses.
+This ransomware family has, however, built up a reputation of consistently decrypting the data once ransom has been paid.
+
+Independent analysis as well as aggregated opinion from the community very strongly suggests that decrypting the data without paying the ransom amount is not possible.
+The cryptography used is based on commercial grade \textit{API} from \textit{Microsoft} and leverages industrial standard algorithms.
+The prime recommendation would be to pay the ransom unless,
+\begin{itemize}
+	\item the data lost has been backed up and is tested to be recoverable to its fullest extent.
+	\item the lost data cumulatively provides less value than ransom itself.
+\end{itemize}
 
 \newpage
 
