@@ -1,0 +1,70 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage{datetime}
+\usepackage{numprint}
+\usepackage{palatino}
+\usepackage{authblk}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage[english]{babel}
+\usepackage[
+	backend=biber,
+	style=numeric,
+]{biblatex}
+\addbibresource{refs.bib}
+
+\hypersetup{%
+    pdfborder = {0 0 0}
+}
+
+\setlength{\parindent}{2em}
+%\setlength{\parskip}{1em}
+\renewcommand{\baselinestretch}{1.0}
+
+\begin{document}
+
+\nplpadding{2}
+
+\title{Malware Analysis Report: ``Practical3.exe''\\ \vspace{-8pt} {\large CAP6137 Malware Reverse Engineering: P0x03}}
+\author{{Naman Arora \\ \vspace{-10pt}\small \href{mailto:naman.arora@ufl.edu}{naman.arora@ufl.edu}}}
+\date{\today}
+
+\maketitle
+\newpage
+\tableofcontents
+\newpage
+\section{Executive Summary}
+
+\newpage
+
+\section{Static Analysis: Primary Executable}
+	\subsection{Basic Identification}
+	\subsection{Malware Sample Family Identification}
+	\subsection{PE Sections}
+	\subsection{A case for Packing}
+	\subsection{Interesting Imports}
+
+\section{Dynamic Analysis}
+	\subsection{Network Based Analysis}
+	\subsection{File System Based Analysis}
+
+\newpage
+
+\section{Indicators of Compromise}
+	\subsection{Network Based}
+	\subsection{Host Based}
+	\subsection{\textit{YARA} Rule}
+		Visit \cite{ghub} for rule file if copying fails.
+		\lstinputlisting[language={},basicstyle=\tiny]{../rule.yar}
+
+\newpage
+
+\section{Appendix A: Screenshots}
+
+\newpage
+
+\printbibliography
+\end{document}
