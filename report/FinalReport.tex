@@ -21,7 +21,7 @@
 }
 
 \setlength{\parindent}{2em}
-%\setlength{\parskip}{1em}
+\setlength{\parskip}{1em}
 \renewcommand{\baselinestretch}{1.0}
 
 \begin{document}
@@ -47,6 +47,7 @@ Nevertheless, on dynamic analysis, the malware injects itself into common \texti
 Any new file created or drive \textit{(for eg. USB etc.)} connected to the system is also targeted and encrypted.
 Before any encryption happens, the malware,
 \begin{itemize}
+	\vspace{-1em}
 	\item Stops and kills multiple services and executables generally associated with commercial systems
 	\item Enumerates all drives associated to the system and all the files within them.
 \end{itemize}
@@ -60,19 +61,116 @@ Independent analysis as well as aggregated opinion from the community very stron
 The cryptographic algorithms used for encryption are industry standard and hence extensively secure.
 The prime recommendation would be to pay the ransom unless,
 \begin{itemize}
+	\vspace{-1em}
 	\item the data lost has been backed up and is tested to be recoverable to its fullest extent.
 	\item the lost data cumulatively provides less value than ransom itself.
 \end{itemize}
 
 \newpage
-
 \section{Static Analysis: Primary Executable}
 	\subsection{Basic Identification}
-	\subsection{Malware Sample Family Identification}
-	\subsection{PE Sections}
-	\subsection{A case for Packing}
-	\subsection{Interesting Imports}
+	\begin{center}
+		\begin{tabular}{c | c}
+			Attribute & Value\\
+			\hline
+			\hline
+			Bits & 64\\
+			Endianess & Little\\
+			Operating System & Microsoft Windows\\
+			\hline
+			Class & PE32+\\
+			Subsystem & Windows GUI\\
+			\hline
+			Size & 175616 Bytes\\
+			Compiler Timestamp & Tue Aug 14 07:46:26 2018\\
+			Compiler & Visual Studio 2015 (Likely)\\
+			SHA256 Hash & 98ece6bcafa296326654db862140520afc19cfa0b4a76a5950deedb2618097ab\\
+			\hline
+		\end{tabular}
+	\end{center}
 
+	\subsection{Malware Sample Family Identification}
+	\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
+		\centering
+		\includegraphics[width=\columnwidth]{pics/virustotal.png}
+		\caption{VirusTotal: VirusTotal Scan}
+		\label{virustotal}
+	\end{figure}
+	The malware is identified to belong to \textit{Ryuk} family of \textit{ransomwares} (Fig. \ref{virustotal}).
+	This identification is corroborated by three observations, \textit{viz.},
+	\begin{itemize}
+	\vspace{-1em}
+		\item On submitting the sample to \textit{Virustotal} \cite{virustotal}, a majority of the \textit{AV} vendors identify it as such.
+		\item Debug file \textit{(pdb)} name within the binary has a path that mentions \textit{Ryuk}.
+		\item On dynamic analysis \textit{(next section)}, it self identifies itself by installing a \textit{RyukReadme.txt} file in each directory.
+	\end{itemize}
+
+	\subsection{PE Headers}
+	\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
+		\centering
+		\includegraphics[width=\columnwidth]{pics/peHeaders.png}
+		\caption{Ghidra: \textit{PE} headers}
+		\label{peHeaders}
+	\end{figure}
+	Sections within the binary show no significant deviation from the norm.
+	All the sections exhibit correct and expected permission sets.
+
+	\subsection{A case against Packing}
+	A packed \textit{PE} executable, in the context of malicious binaries, is used to obfuscate behavior in hopes of evading static analysis and \textit{AV} detection.
+	The binary sample, though, attempts no such evasion.
+	It is very unlikely that the given sample is packed or encrypted in any way given the following observations,
+	\begin{itemize}
+	\vspace{-1em}
+		\item The sheer quantity of imports gathered from auto-analysis within \textit{Ghidra}, some of which are generally associated with malicious behavior (Fig \ref{importsAdvapi32}, \ref{importsKernel32} and \ref{importsShell32})
+		\item Multiple strings indicating malicious behavior 
+	\end{itemize}
+
+	\subsection{Interesting Imports}
+	Following are the interesting \textit{DLLS} that are imported,
+		\subsubsection*{\textit{Advapi32.dll}}
+		\vspace{-1em}
+		The malware sample imports functions like \textit{AdjustTokenPrivileges, GetTokenInformation, OpenProcessToken etc.} indicate some token privilege escalation (Fig. \ref{importsAdvapi32}).
+		Such a behavior indicate the possibility of process injection, which on further analysis, pans out.
+
+		\subsubsection*{\textit{Kernel32.dll}}
+		\vspace{-1em}
+		The functions imported from this library can be further subdivided in terms of their intended use as,
+		\begin{itemize}
+		\vspace{-1em}
+			\item Functions like \textit{OpenProcess, VirtualAllocEx, VirtualFreeEx, CreateRemoteThread and WriteProcessMemory} indicate a strong possibility, in conjunction with above \textit{token} related imports, of process injection.
+			\item Functions like \textit{FindFirstFileExA, FindNextFileA and SetFilePointerEx} indicate towards filesystem enumeration.
+			\item Functions like \textit{GetProcAddress and LoadLibraryA} indicate dynamic resolution of function references  which, in conjunction with strong traits of process injection, give a bigger picture.
+		\end{itemize}
+		Refer to figure \ref{importsKernel32}.
+
+		\subsubsection*{\textit{Shell32.dll}}
+		\vspace{-1em}
+		The functions imported from this library \textit{ShellExecuteA and ShellExecuteW}, on further analysis, reveal to be used in stopping system processes and executables (Fig \ref{importsShell32}).
+
+	\subsection{Interesting Code Constructs}
+		\subsubsection*{The Stopping of System Services}
+		\vspace{-1em}
+		Before any significant exhibition of malicious behavior, the malware sample uses the shell execution commands to stop a list of predefined processes and executables.
+		This list is contained within the binary and can be referenced here \cite{stoppedServices} and \cite{stoppedProcesses}.
+		It uses \textit{``taskkill /IM \${taskName} /F''} and \textit{``net stop \${serviceName} /y''} template commands to achieve this.
+		All the tasks and executables are generally associated with commercial systems which further strengthens the argument that this malware targets businesses rather than private individuals.
+		The function responsible for this execution is at offset \textit{\textbf{7ff686d11250}}.
+
+		\subsubsection*{Process Injection}
+		\vspace{-1em}
+		The malware sample, after stopping common services and processes, injects itself into virtual memory section of multiple \textit{Windows} services.
+		Primary function that implements this injection receives a list of arguments including the process name of the victim process and its \textit{PID}.
+		This function then calculates its own size and allocates memory within the victim process and writes itself to that memory area.
+		Following that, it calls \textit{CreateRemoteThread} to execute a function within its own memory area located at offset \textit{\textbf{7ff686d119b0}}.
+		The function responsible for all this is at offset \textit{\textbf{7ff686d126f0}}.
+
+		\subsubsection*{Dynamic Function Address Resolution}
+		\vspace{-1em}
+		Once the remote process injection is successful and the remote thread has begun the routine which the malware sample requested, a function located at offset \textit{\textbf{7ff686d16850}} is then called.
+		This function is responsible for dynamically resolving addresses to a series of function that, down the line, rest of the malware uses.
+		Some function that are resolved by the said function are absent from the list of imports statically available for investigation (talked about in the dynamic analysis section).
+
+\newpage
 \section{Dynamic Analysis}
 	\subsection{Network Based Analysis}
 	\subsection{File System Based Analysis}
@@ -83,14 +181,32 @@ The prime recommendation would be to pay the ransom unless,
 	\subsection{Network Based}
 	\subsection{Host Based}
 	\subsection{\textit{YARA} Rule}
-		Visit \cite{ghub} for rule file if copying fails.
 		\lstinputlisting[language={},basicstyle=\tiny]{../rule.yar}
 
 \newpage
 
 \section{Appendix A: Screenshots}
+\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
+	\centering
+	\includegraphics[width=\columnwidth]{pics/importsAdvapi32.png}
+	\caption{Ghidra: \textit{Advapi32.dll} Imports}
+	\label{importsAdvapi32}
+\end{figure}
+
+\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
+	\centering
+	\includegraphics[width=\columnwidth]{pics/importsKernel32.png}
+	\caption{Ghidra: \textit{Kernel32.dll} Imports}
+	\label{importsKernel32}
+\end{figure}
+
+\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
+	\centering
+	\includegraphics[width=\columnwidth]{pics/importsShell32.png}
+	\caption{Ghidra: \textit{Shell32.dll} Imports}
+	\label{importsShell32}
+\end{figure}
 
 \newpage
-
 \printbibliography
 \end{document}
