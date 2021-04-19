@@ -54,7 +54,7 @@ Before any encryption happens, the malware,
 
 The execution of malware is entirely offline and hence once infected, isolating the system from the network does not thwart its any malicious activities.
 This also means that leaking of sensitive information from the infected system is highly improbable as a result of this infection.
-After encryption, the malware installs multiple text files named \textit{RyukReadme.txt} acknowledging the data loss, stating the ransom and providing correspondence email and \textit{Bitcoin Wallet} addresses.
+After encryption, the malware installs multiple text files named \textit{RyukReadMe.txt} acknowledging the data loss, stating the ransom and providing correspondence email and \textit{Bitcoin Wallet} addresses.
 This ransomware family has, however, built up a reputation of consistently decrypting the data once ransom has been paid.
 
 Independent analysis as well as aggregated opinion from the community very strongly suggests that decrypting the data without paying the ransom amount is not possible.
@@ -67,7 +67,7 @@ The prime recommendation would be to pay the ransom unless,
 \end{itemize}
 
 \newpage
-\section{Static Analysis: Primary Executable}
+\section{Static Analysis}
 	\subsection{Basic Identification}
 	\begin{center}
 		\begin{tabular}{c | c}
@@ -90,30 +90,18 @@ The prime recommendation would be to pay the ransom unless,
 	\end{center}
 
 	\subsection{Malware Sample Family Identification}
-	\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
-		\centering
-		\includegraphics[width=\columnwidth]{pics/virustotal.png}
-		\caption{VirusTotal: VirusTotal Scan}
-		\label{virustotal}
-	\end{figure}
 	The malware is identified to belong to \textit{Ryuk} family of \textit{ransomwares} (Fig. \ref{virustotal}).
 	This identification is corroborated by three observations, \textit{viz.},
 	\begin{itemize}
 	\vspace{-1em}
 		\item On submitting the sample to \textit{Virustotal} \cite{virustotal}, a majority of the \textit{AV} vendors identify it as such.
 		\item Debug file \textit{(pdb)} name within the binary has a path that mentions \textit{Ryuk}.
-		\item On dynamic analysis \textit{(next section)}, it self identifies itself by installing a \textit{RyukReadme.txt} file in each directory.
+		\item On dynamic analysis \textit{(next section)}, it self identifies itself by installing a \textit{RyukReadMe.txt} file in each directory.
 	\end{itemize}
 
 	\subsection{PE Headers}
-	\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
-		\centering
-		\includegraphics[width=\columnwidth]{pics/peHeaders.png}
-		\caption{Ghidra: \textit{PE} headers}
-		\label{peHeaders}
-	\end{figure}
 	Sections within the binary show no significant deviation from the norm.
-	All the sections exhibit correct and expected permission sets.
+	All the sections exhibit correct and expected permission sets (Fig. \ref{peHeaders}).
 
 	\subsection{A case against Packing}
 	A packed \textit{PE} executable, in the context of malicious binaries, is used to obfuscate behavior in hopes of evading static analysis and \textit{AV} detection.
@@ -167,30 +155,87 @@ The prime recommendation would be to pay the ransom unless,
 		\subsubsection*{Dynamic Function Address Resolution}
 		\vspace{-1em}
 		Once the remote process injection is successful and the remote thread has begun the routine which the malware sample requested, a function located at offset \textit{\textbf{7ff686d16850}} is then called.
-		This function is responsible for dynamically resolving addresses to a series of function that, down the line, rest of the malware uses.
+		This function is responsible for dynamically resolving addresses to a series of functions that, down the line, rest of the malware uses.
 		Some function that are resolved by the said function are absent from the list of imports statically available for investigation (talked about in the dynamic analysis section).
-
 \newpage
 \section{Dynamic Analysis}
-	\subsection{Network Based Analysis}
-	\subsection{File System Based Analysis}
+	\subsection{Interesting Features}
+	The following interesting features were observed on dynamically analyzing the malware sample,
+	\begin{itemize}
+	\vspace{-1em}
+		\item As expected and previously mentioned in \textit{static analysis} section, the malware issues multiple shell commands to stop processes and executables mentioned in \cite{stoppedProcesses} and \cite{stoppedServices}.
+		\item The malware injects itself into important \textit{Windows} services like \textit{sihost.exe, crss.exe, lsass.exe, etc.} and initiates the function at offset \textit{\textbf{7ff686d119b0}}.
+		\item The \textit{injection-victim} process then executes the function at offset \textit{\textbf{7ff686d16850}}. This function is, apparently, responsible for resolving multiple import addresses. Some new and previously unknown imports are revealed, most notably,
+		\begin{itemize}
+	 		\item \textit{CryptAcquireContext, CryptImportKey, CryptExportKey, CryptGenKey and CryptEncrypt} which are then later used for the actual cryptographic encryption of the data stored on the victim system.
+			\item \textit{GetLogicalDrives and GetDriveType} which, within a loop, indicates that all the drives connected to the system, physical and virtual, are enumerated for the purpose of encrypting.
+		\end{itemize}
+		Also, interestingly, a minority yet non-trivial quantity of imports within the resolution process are never stored anywhere and are never used either.
+		This might indicate use of a scripted routine to actually write high level code within the malware.
+		With that assumption at hand, a \textit{YARA} rule can leverage such a script`s repeated usage for malware author`s attribution/connection with other malware samples.
+		\item A dedicated subroutine at the offset \textit{\textbf{7ff686d14710}} receives the file name to encrypt which then the function reads in, encrypts and writes back out.
+		\item The \textit{``RyukReadMe.txt''} seems to be stored within the malware binary encoded, most likely, in \textit{Base64} encoding. This, though, could not be firmly established in this analysis.
+		The suspected functions for this trait seem to reside at offsets \textit{\textbf{7ff686d12890 and 7ff686d112f0}}.
+		\item Multiple references to \textit{CryptAcquireContext} seem to suggest the following,
+		\begin{itemize}
+			\item There are two types of \textit{Cryptographic Services Providers (CSPs)} spotted as arguments to calls to this function, \textit{viz. AES and RSA}.
+			\item The \textit{RSA} key instance seems to be embedded as a \textit{Keyblob} type within the binary`s data section at offset \textit{\textbf{7ff686d34a10}}.
+		\end{itemize}
+		The above observations lead to an educated guess that the imported key is a \textit{RSA Public key} and another \textit{AES} session key is generated while execution is taking place.
+		The process of encryption then would look like,
+		\begin{itemize}
+			\item Import the \textit{RSA public key}
+			\item Generate an \textit{AES} session key
+			\item Encrypt files with the session key
+			\item Generate unique ID which is directly linked with the session key and encrypt that ID with the \textit{RSA} public key and store it on the disk.
+		\end{itemize}
+		The above sequence could not be verified in its entirety but serves as an educated guess.
+		\item The malware sample never encrypts any executable or \textit{DLL} file.
+	\end{itemize}
+
+	\subsection{File System Interaction}
+	The malware sample interacts with the filesystem in the following ways,
+	\begin{itemize}
+	\vspace{-1em}
+		\item It writes a file \textit{``C:\textbackslash Users\textbackslash Public\textbackslash UNIQUE\_ID\_DO\_NOT\_REMOVE''}.
+		\item Writes a file \textit{``RyukReadme.txt''} \cite{ryukReadme} at each node returned by \textit{FindNextFileA} function.
+		\item Writes a batch script \textit{``C:\textbackslash Users\textbackslash Public\textbackslash window.bat''} \cite{window} which is deleted after execution
+		\item Encrypts all data files
+		\item Gaines persistance over reboots of system by adding itself to the \textit{RegistryKey}
+		
+		\textit{``HKCU\textbackslash SOFTWARE\textbackslash Microsoft\textbackslash Windows\textbackslash CurrentVersion\textbackslash Run ''}. Although consistent, this cannot be an considered an indicator of compromise since the value of the executable name might vary.
+	\end{itemize}
+
+	\subsection{Network Interaction}
+	The malware sample exhibited no attempt to access network resources during this analysis.
 
 \newpage
 
 \section{Indicators of Compromise}
-	\subsection{Network Based}
 	\subsection{Host Based}
+	\begin{itemize}
+	\vspace{-1em}
+		\item Presence of the file \textit{``C:\textbackslash Users\textbackslash Public\textbackslash UNIQUE\_ID\_DO\_NOT\_REMOVE''}
+		\item Presence of the file \textit{``RyukReadme.txt''}
+	\end{itemize}
 	\subsection{\textit{YARA} Rule}
+	In case of unsuccessful copy from text below, use \cite{yara}.
 		\lstinputlisting[language={},basicstyle=\tiny]{../rule.yar}
 
 \newpage
-
 \section{Appendix A: Screenshots}
 \begin{figure}[!htbp]% [!hb] forces image to be placed at that position
 	\centering
-	\includegraphics[width=\columnwidth]{pics/importsAdvapi32.png}
-	\caption{Ghidra: \textit{Advapi32.dll} Imports}
-	\label{importsAdvapi32}
+	\includegraphics[width=\columnwidth]{pics/virustotal.png}
+	\caption{VirusTotal: VirusTotal Scan}
+	\label{virustotal}
+\end{figure}
+
+\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
+	\centering
+	\includegraphics[width=\columnwidth]{pics/peHeaders.png}
+	\caption{Ghidra: \textit{PE} headers}
+	\label{peHeaders}
 \end{figure}
 
 \begin{figure}[!htbp]% [!hb] forces image to be placed at that position
@@ -198,6 +243,13 @@ The prime recommendation would be to pay the ransom unless,
 	\includegraphics[width=\columnwidth]{pics/importsKernel32.png}
 	\caption{Ghidra: \textit{Kernel32.dll} Imports}
 	\label{importsKernel32}
+\end{figure}
+
+\begin{figure}[!htbp]% [!hb] forces image to be placed at that position
+	\centering
+	\includegraphics[width=\columnwidth]{pics/importsAdvapi32.png}
+	\caption{Ghidra: \textit{Advapi32.dll} Imports}
+	\label{importsAdvapi32}
 \end{figure}
 
 \begin{figure}[!htbp]% [!hb] forces image to be placed at that position
